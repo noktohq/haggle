@@ -1,5 +1,7 @@
 # Haggle — your AI haggles with our AI
 
+[![CI](https://github.com/noktohq/haggle-/actions/workflows/ci.yml/badge.svg)](https://github.com/noktohq/haggle-/actions/workflows/ci.yml)
+
 **The first bike store where your agent negotiates the price.** Haggle adds
 [WebMCP](https://github.com/webmachinelearning/webmcp) tools to a real Shopify
 storefront so the customer's agent (ChatGPT's browser, or Chrome with WebMCP
@@ -50,6 +52,8 @@ are discarded. No key? A deterministic Norwegian template voice takes over.
 ```
 server/       zero-dependency Node 20 negotiation service (+ Dockerfile)
 storefront/   webmcp-haggle.js theme snippet · INSTALL.md · standalone demo.html
+e2e/          Playwright suite driving the WebMCP tools like an agent would
+scripts/      smoke.sh — black-box HTTP negotiation, same script CI runs
 docs/         WebMCP API notes with sources
 ```
 
@@ -58,6 +62,7 @@ docs/         WebMCP API notes with sources
 ```bash
 cd server
 npm test                                   # negotiation engine test suite
+npm ci && npm run typecheck                # strict tsc over the JSDoc-typed source
 MOCK_PRODUCTS=1 node src/index.js          # runs on :8080 with a fixture catalog
 ```
 
@@ -72,6 +77,10 @@ curl -s -X POST localhost:8080/api/accept -H 'Content-Type: application/json' \
      -d '{"sessionId":"<id>"}'
 ```
 
+Or let the machines do it: `bash scripts/smoke.sh` runs that exact loop, and
+`cd e2e && npm ci && npx playwright test` plays the buyer's agent in Chromium
+against the real storefront script — the same checks CI runs on every push.
+
 Or serve `storefront/` statically over HTTPS and open `demo.html` in Chrome with
 `chrome://flags/#enable-webmcp-testing` for the full WebMCP loop without Shopify.
 
@@ -82,6 +91,19 @@ Or serve `storefront/` statically over HTTPS and open `demo.html` in Chrome with
    (custom app with `read_products` + `write_discounts`), `MAX_DISCOUNT_PCT`,
    optional `ANTHROPIC_API_KEY`.
 3. Install the theme snippet: see `storefront/INSTALL.md`.
+
+## Engineering notes
+
+- **Zero-dependency runtime.** `server/` runs on plain Node 20 — `node src/index.js`
+  is the whole deploy. `typescript` and `@types/node` are dev-only, for checking.
+- **Typed without a build step.** The server source is JSDoc-annotated JS under
+  `// @ts-check`; `npm run typecheck` runs `tsc --checkJs --noEmit` in strict mode.
+- **The WebMCP surface is e2e-tested.** Playwright loads the real `demo.html`, shims
+  `document.modelContext` the way an agent runtime would, captures the registered
+  tools and plays the buyer's agent through a full negotiation (`e2e/`).
+- **Price floor by structure, not by prompt.** The floor exists only inside the
+  deterministic engine. Unit tests hammer it (never breached, never leaked), and
+  both the smoke script and the e2e suite re-assert the bounds over the wire.
 
 ## License
 
