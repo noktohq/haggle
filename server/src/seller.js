@@ -1,7 +1,17 @@
+// @ts-check
 // The seller's "voice". Numbers are decided by negotiation.js before this file
 // is consulted — an LLM may only phrase the message, never move a price. With
 // no ANTHROPIC_API_KEY (or on any error) deterministic Norwegian templates run.
 
+/**
+ * @typedef {object} VoiceParams
+ * @property {string} title
+ * @property {number} [offer]        The buyer's latest offer in NOK
+ * @property {number} [sellerOffer]  The seller's authoritative price in NOK
+ * @property {number} [dealPrice]    The sealed deal price in NOK
+ */
+
+/** @type {Record<string, ((p: VoiceParams) => string)[]>} */
 const T = {
   accept: [
     (p) => `Da har vi en avtale! ${p.dealPrice} kr for ${p.title} — godt forhandlet. Bruk rabattkoden i kassen.`,
@@ -22,11 +32,25 @@ const T = {
   closed: [() => `Denne forhandlingen er avsluttet. Start en ny om du vil prøve igjen.`],
 };
 
+/**
+ * @param {string} kind
+ * @param {VoiceParams} params
+ * @param {number} round
+ * @returns {string}
+ */
 function template(kind, params, round) {
   const list = T[kind] || T.closed;
   return list[round % list.length](params);
 }
 
+/**
+ * Phrase the seller's reply. All numbers in `params` are already decided and
+ * clamped by the negotiation engine — this function only chooses words.
+ * @param {string} kind   Decision kind: accept | counter | reject | final | closed
+ * @param {VoiceParams} params
+ * @param {number} round  Current round, used to vary the template
+ * @returns {Promise<string>}
+ */
 export async function sellerMessage(kind, params, round) {
   const fallback = template(kind, params, round);
   const key = process.env.ANTHROPIC_API_KEY;
@@ -55,7 +79,7 @@ export async function sellerMessage(kind, params, round) {
       signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) return fallback;
-    const body = await res.json();
+    const body = /** @type {any} */ (await res.json());
     const text = (body.content?.[0]?.text || '').trim();
     // Guard: the phrased message must mention the authoritative number.
     const mustMention = String(params.sellerOffer ?? params.dealPrice);

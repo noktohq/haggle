@@ -1,14 +1,64 @@
+// @ts-check
 // Deterministic negotiation engine. All price authority lives here, server-side.
 // The agent never sees the floor; every number the seller says is computed and
 // clamped in this file regardless of which "voice" (template or LLM) phrases it.
 
+/**
+ * @typedef {object} Product
+ * @property {string} id        Shopify GID
+ * @property {string} handle
+ * @property {string} title
+ * @property {number} price     Listed price in whole NOK
+ */
+
+/**
+ * @typedef {object} HistoryEntry
+ * @property {'buyer'|'seller'} who
+ * @property {number} price
+ * @property {boolean} [accepted]
+ * @property {boolean} [final]
+ * @property {boolean} [lowball]
+ */
+
+/**
+ * @typedef {object} Session
+ * @property {string} productHandle
+ * @property {string} productId
+ * @property {string} productTitle
+ * @property {number} listPrice
+ * @property {number} floor       Secret — never serialized to clients
+ * @property {number} sellerOffer
+ * @property {number} rounds
+ * @property {'open'|'agreed'|'closed'} state
+ * @property {number|null} dealPrice
+ * @property {HistoryEntry[]} history
+ * @property {string} [code]      Discount code, set once the deal is minted
+ */
+
+/**
+ * @typedef {object} Decision
+ * @property {'accept'|'counter'|'reject'|'final'|'closed'} kind
+ * @property {number} sellerOffer
+ * @property {number} [dealPrice]
+ */
+
 const MAX_ROUNDS = 6;
 
-/** Round to nearest 50 NOK — bike-shop prices feel human that way. */
+/**
+ * Round to nearest 50 NOK — bike-shop prices feel human that way.
+ * @param {number} n
+ * @returns {number}
+ */
 function toHuman(n) {
   return Math.round(n / 50) * 50;
 }
 
+/**
+ * Open a negotiation session for one product.
+ * @param {Product} product
+ * @param {number} maxDiscountPct  Hard ceiling on the discount, in percent
+ * @returns {Session}
+ */
 export function createNegotiation(product, maxDiscountPct) {
   const listPrice = Math.round(Number(product.price));
   const floor = toHuman(listPrice * (1 - maxDiscountPct / 100));
@@ -27,8 +77,10 @@ export function createNegotiation(product, maxDiscountPct) {
 }
 
 /**
- * Apply a buyer offer. Mutates and returns the session with a decision:
- * {kind: 'accept'|'counter'|'reject'|'final'|'closed', sellerOffer, dealPrice?}
+ * Apply a buyer offer. Mutates the session and returns the seller's decision.
+ * @param {Session} s
+ * @param {unknown} rawOffer  Untrusted client input, coerced and validated here
+ * @returns {Decision}
  */
 export function applyOffer(s, rawOffer) {
   if (s.state !== 'open') return { kind: 'closed', sellerOffer: s.sellerOffer };
@@ -76,9 +128,13 @@ export function applyOffer(s, rawOffer) {
   return { kind: lowball ? 'reject' : 'counter', sellerOffer: s.sellerOffer };
 }
 
-/** Buyer accepts the seller's standing offer. */
+/**
+ * Buyer accepts the seller's standing offer.
+ * @param {Session} s
+ * @returns {number} The sealed deal price
+ */
 export function acceptStanding(s) {
-  if (s.state === 'agreed') return s.dealPrice;
+  if (s.state === 'agreed') return /** @type {number} */ (s.dealPrice);
   if (s.state !== 'open') throw new Error('negotiation closed');
   s.state = 'agreed';
   s.dealPrice = s.sellerOffer;
@@ -86,7 +142,10 @@ export function acceptStanding(s) {
   return s.dealPrice;
 }
 
-/** Client-safe view — floor stays secret. */
+/**
+ * Client-safe view — floor stays secret.
+ * @param {Session} s
+ */
 export function publicView(s) {
   return {
     product: { handle: s.productHandle, title: s.productTitle, listPrice: s.listPrice },

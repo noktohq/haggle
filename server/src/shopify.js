@@ -1,7 +1,12 @@
+// @ts-check
 // Shopify Admin GraphQL client. Product prices are ALWAYS fetched here —
 // client-supplied prices are never trusted. With MOCK_PRODUCTS=1 the module
 // serves a fixture catalog instead, so tests and judges can run without tokens.
 
+/** @typedef {import('./negotiation.js').Product} Product */
+/** @typedef {import('./negotiation.js').Session} Session */
+
+/** @type {Product[]} */
 const MOCK_CATALOG = [
   { id: 'gid://shopify/Product/1', handle: 'demo-ecoride-tripper', title: 'Ecoride Tripper Gen4 (demo)', price: 36995 },
   { id: 'gid://shopify/Product/2', handle: 'demo-ecoride-flexer', title: 'Ecoride Flexer Gen3 (demo)', price: 21995 },
@@ -16,6 +21,12 @@ function cfg() {
   };
 }
 
+/**
+ * Run one query/mutation against the Shopify Admin GraphQL API.
+ * @param {string} query
+ * @param {Record<string, unknown>} variables
+ * @returns {Promise<any>} The `data` field of the GraphQL response
+ */
 async function adminGraphql(query, variables) {
   const { domain, token, apiVersion } = cfg();
   if (!domain || !token) throw new Error('Shopify credentials not configured');
@@ -25,11 +36,16 @@ async function adminGraphql(query, variables) {
     body: JSON.stringify({ query, variables }),
   });
   if (!res.ok) throw new Error(`Shopify HTTP ${res.status}`);
-  const body = await res.json();
+  const body = /** @type {any} */ (await res.json());
   if (body.errors?.length) throw new Error(`Shopify: ${body.errors[0].message}`);
   return body.data;
 }
 
+/**
+ * Fetch a product (with its authoritative price) by handle.
+ * @param {string} handle
+ * @returns {Promise<Product>}
+ */
 export async function fetchProductByHandle(handle) {
   if (cfg().mock) {
     const p = MOCK_CATALOG.find((p) => p.handle === handle);
@@ -54,9 +70,13 @@ export async function fetchProductByHandle(handle) {
   };
 }
 
-/** Create a single-use discount code worth (listPrice - dealPrice) NOK, scoped to the product. */
+/**
+ * Create a single-use discount code worth (listPrice - dealPrice) NOK, scoped to the product.
+ * @param {Session} session  A session in state 'agreed' (dealPrice set)
+ * @returns {Promise<{code: string, amountOff: number}>}
+ */
 export async function createDealDiscount(session) {
-  const amountOff = session.listPrice - session.dealPrice;
+  const amountOff = session.listPrice - /** @type {number} */ (session.dealPrice);
   const code = 'HAGGLE-' + Math.random().toString(36).slice(2, 8).toUpperCase();
   if (cfg().mock) return { code, amountOff };
   const now = new Date();

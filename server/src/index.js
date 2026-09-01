@@ -1,3 +1,4 @@
+// @ts-check
 // Haggle negotiation service — zero-dependency Node 20 HTTP server.
 // Run: node src/index.js   (see ../.env.example for configuration)
 
@@ -11,12 +12,19 @@ const PORT = Number(process.env.PORT) || 8080;
 const MAX_DISCOUNT_PCT = Math.min(50, Math.max(0, Number(process.env.MAX_DISCOUNT_PCT) || 10));
 const SESSION_LIMIT = 500; // in-memory demo store; oldest evicted first
 
+/** @typedef {import('./negotiation.js').Session} Session */
+
+/** @type {Map<string, Session>} */
 const sessions = new Map();
 
 function newSessionId() {
   return crypto.randomBytes(9).toString('base64url');
 }
 
+/**
+ * @param {string|undefined} origin
+ * @returns {Record<string, string>}
+ */
 function corsHeaders(origin) {
   const allowed = (process.env.ALLOWED_ORIGINS || '').split(',').map((s) => s.trim()).filter(Boolean);
   const ok =
@@ -32,11 +40,21 @@ function corsHeaders(origin) {
   };
 }
 
+/**
+ * @param {http.ServerResponse} res
+ * @param {number} status
+ * @param {Record<string, string>} headers
+ * @param {unknown} body
+ */
 function send(res, status, headers, body) {
   res.writeHead(status, headers);
   res.end(JSON.stringify(body));
 }
 
+/**
+ * @param {http.IncomingMessage} req
+ * @returns {Promise<Record<string, unknown>>}
+ */
 async function readJson(req) {
   let raw = '';
   for await (const chunk of req) {
@@ -49,7 +67,7 @@ async function readJson(req) {
 const server = http.createServer(async (req, res) => {
   const headers = corsHeaders(req.headers.origin);
   if (req.method === 'OPTIONS') return void send(res, 204, headers, {});
-  const url = new URL(req.url, 'http://x');
+  const url = new URL(req.url || '/', 'http://x');
 
   try {
     if (req.method === 'GET' && url.pathname === '/healthz') {
@@ -69,7 +87,10 @@ const server = http.createServer(async (req, res) => {
       const product = await fetchProductByHandle(productHandle);
       const s = createNegotiation(product, MAX_DISCOUNT_PCT);
       const id = newSessionId();
-      if (sessions.size >= SESSION_LIMIT) sessions.delete(sessions.keys().next().value);
+      if (sessions.size >= SESSION_LIMIT) {
+        const oldest = sessions.keys().next().value;
+        if (oldest !== undefined) sessions.delete(oldest);
+      }
       sessions.set(id, s);
       const message = `Velkommen! ${s.productTitle} står i ${s.listPrice} kr. Men jeg hører gjerne et bud.`;
       return void send(res, 200, headers, { sessionId: id, message, ...publicView(s) });
@@ -116,19 +137,21 @@ const server = http.createServer(async (req, res) => {
         s.state = 'closed';
       }
       const message = await sellerMessage('accept', { title: s.productTitle, dealPrice, sellerOffer: dealPrice }, s.rounds);
+      // publicView(s).dealPrice === dealPrice here — spread first keeps tsc happy.
       return void send(res, 200, headers, {
+        ...publicView(s),
         message,
         dealPrice,
         discountCode: s.code,
         howToUse: `Legg ${s.productTitle} i handlekurven og bruk koden ${s.code} i kassen. Gyldig i 48 timer, kun ett kjøp.`,
-        ...publicView(s),
       });
     }
 
     send(res, 404, headers, { error: 'not found' });
   } catch (err) {
     send(res, 500, headers, { error: 'internal error' });
-    console.error(`[haggle] ${req.method} ${url.pathname}: ${err.message}`);
+    const reason = err instanceof Error ? err.message : String(err);
+    console.error(`[haggle] ${req.method} ${url.pathname}: ${reason}`);
   }
 });
 
