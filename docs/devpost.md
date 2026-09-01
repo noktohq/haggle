@@ -18,46 +18,39 @@ becomes a real discount code at a real Shopify checkout.
 ### Inspiration
 
 Price negotiation died when commerce moved online — it needed a human on both
-ends. WebMCP removes exactly that constraint: a storefront can now expose a
-*negotiation protocol* as tools, and the browser's agent represents the buyer
-while the human keeps the final say. We wanted to build the first store where
-"can you do better on the price?" is something your agent just… does.
-
-The timing matters, too. Agentic commerce is arriving — ChatGPT's browser,
-Chrome's WebMCP work — and when agents do the shopping, merchants get squeezed
-into pure price comparison. A sanctioned negotiation channel with a hard,
-merchant-set ceiling is the merchant's controlled answer to that squeeze.
+ends. WebMCP removes exactly that constraint: the storefront exposes a
+*negotiation protocol* as tools, the browser's agent represents the buyer, and
+the human keeps the final say. We wanted to build the first store where "can
+you do better on the price?" is something your agent just… does — and the
+timing is right: when agents do the shopping, merchants get squeezed into pure
+price comparison, and a sanctioned negotiation channel with a hard ceiling is
+their controlled answer.
 
 ### What it does
 
-Bikepoint is a real Shopify store with a real e-bike catalog. One script line
-in the theme registers five WebMCP tools (`list_negotiable_products`,
-`start_negotiation`, `make_offer`, `get_negotiation_state`, `accept_deal`) on
-every page of the store — on a product page they default to that product, and
-from anywhere else the agent can list the catalog and pick. Your agent opens a
-negotiation with the store's server-side AI seller, trades offers in NOK over
-up to six rounds, and when you accept, the server mints a **real single-use
-Shopify discount code** scoped to that product, valid 48 hours. The human
-redeems it in the normal checkout — and because the code is single-use,
-product-scoped and short-lived, it can't leak to coupon sites the way ordinary
-discount codes do. Only one buyer can ever redeem it.
+**Your agent → negotiation → real deal → real Shopify discount code →
+checkout.** That is the whole loop, and it runs live today on Bikepoint, a
+Shopify store with a real e-bike catalog.
 
-The seller cannot be talked below its secret floor — not because a prompt says
-so, but because the floor never leaves a deterministic engine. **Try to
-jailbreak it: the seller can't be social-engineered below the floor, because
-the seller never knows anything the engine didn't already decide.**
+**Claude speaks. The engine decides every price. The floor cannot be
+negotiated away** — the seller never knows anything the engine didn't decide,
+so there is nothing to jailbreak. Try it.
 
-Because Shopify's own storefront WebMCP tools (`update_cart`,
-`proceed_to_checkout`, …) are live on the same pages — Shopify's own
-`webmcp_adapter` is present and feature-detects the very same
-`document.modelContext` surface, which we verified on the live store — the full
-loop is agentic: negotiate the price with our tools, add to cart and check out
-with Shopify's. Zero coordination between the two.
+One script line in the theme registers five WebMCP tools
+(`list_negotiable_products`, `start_negotiation`, `make_offer`,
+`get_negotiation_state`, `accept_deal`) on every page of the store; on a
+product page they default to that product. The agent trades offers in NOK with
+the server-side AI seller over up to six rounds. Accept, and the server mints
+a single-use discount code scoped to that product, valid 48 hours — worthless
+to coupon sites, redeemed in the normal checkout.
 
-A small on-page widget shows the human what their agent is doing in real time —
-offers, counteroffers, and the final code. To human visitors the store
-deliberately looks like a completely normal bike shop: the negotiation surface
-is visible only to agents.
+Shopify's own storefront WebMCP tools (`update_cart`, `proceed_to_checkout`,
+…) are live on the same pages — Shopify's `webmcp_adapter` feature-detects the
+very same `document.modelContext` surface, verified on the live store. So the
+full journey is agentic with zero coordination: negotiate with our tools, cart
+and check out with Shopify's. A small widget shows the human the negotiation
+in real time; to everyone else the store looks like a completely normal bike
+shop.
 
 An actual negotiation from the live store, verbatim:
 
@@ -74,85 +67,71 @@ Because negotiation is controlled price discrimination — the oldest trick in
 retail, finally automatable:
 
 - **Capture price-sensitive buyers without a storewide sale.** The list price
-  keeps its integrity; only buyers who bother to negotiate get below it, and
-  never below the merchant's hard ceiling (`MAX_DISCOUNT_PCT`, 10 % here).
-- **"Everyone just gets 10 % — it's a hidden sale"? No.** The engine's
-  round-and-concession curve closes lazy bids well above the floor, and even a
-  perfectly played negotiation bottoms out at the seller's final offer — a step
-  above the floor, which itself is never crossed. The ceiling is per-store, and
-  per-product floors are on the roadmap.
-- **The deal can't leak.** The code is single-use, product-scoped and expires
-  in 48 hours (verifiable in the source: `discountCodeBasicCreate`) — unlike a
-  regular discount code it's worthless on Honey or coupon sites.
-- **Who this is for:** high-ticket Shopify categories with real margins and a
+  keeps its integrity; only buyers who negotiate get below it, and never below
+  the merchant's ceiling (`MAX_DISCOUNT_PCT`, 10 % here).
+- **"Everyone just gets 10 %"? No.** Lazy bids close well above the floor, and
+  even a perfectly played negotiation bottoms out at the seller's final offer —
+  a step above a floor that is never crossed.
+- **The deal can't leak.** Single-use, product-scoped, 48-hour expiry
+  (`discountCodeBasicCreate`). Only one buyer can ever redeem it.
+- **Who it's for:** high-ticket Shopify categories with real margins and a
   haggling culture — bikes, furniture, jewelry, appliances, refurbished
   electronics. Installation is one script line on any Online Store 2.0 theme,
   invisible to non-agent visitors.
-- **Prior art is one-way or human-gated:** eBay's Best Offer and "make an
-  offer" apps are marketplace-bound or wait on a human; coupon plugins are
-  static. Haggle is an instant, two-way, real-time protocol between two AIs on
-  the merchant's own store.
+- **Prior art is one-way or human-gated:** eBay's Best Offer waits on a human,
+  coupon plugins are static. Haggle is an instant, two-way protocol between
+  two AIs on the merchant's own store.
 
 ### How we built it
 
-- **Server:** zero-dependency Node 20 negotiation service on Cloud Run. The
-  price floor (max discount %) exists only inside a deterministic engine —
-  never in a prompt, never on the client. JSDoc-typed under `tsc --checkJs`
-  strict; unit tests hammer the floor (never breached, never leaked).
-- **Seller voice — pluggable, never in charge:** with an Anthropic key, Claude
-  phrases the seller's replies (a charming Norwegian bike dealer); without
-  one, a deterministic Norwegian template voice speaks. Either way the voice
-  only *phrases* — every number is computed and clamped by the engine first,
-  and any reply that doesn't quote the authoritative price is discarded.
-- **Storefront:** one `<script>` line in the Shopify theme loads
-  `webmcp-haggle.js`, which registers the tools on `document.modelContext`
-  (with the `navigator.modelContext` fallback) and talks to the server.
-- **Deals are real:** `discountCodeBasicCreate` via the Shopify Admin API —
-  single-use, product-scoped, 48-hour expiry.
-- **Tested like an agent:** a Playwright suite shims `document.modelContext`
-  (and, in a separate spec, the `navigator.modelContext` fallback) the way an
-  agent runtime would, captures the registered tools and plays the buyer
-  through full negotiations — in CI on every push to main and on every PR. The
-  live store loads this same storefront source file, pinned by commit on a CDN.
+- **Server:** a zero-dependency Node 20 service on Cloud Run. The price floor
+  exists only inside a deterministic engine — never in a prompt, never on the
+  client — and the tests hammer it: never breached, never leaked.
+- **Seller's voice, never in charge:** Claude phrases the replies (a charming
+  Norwegian bike dealer) when a key is set; a deterministic Norwegian template
+  voice otherwise. Either way the voice only *phrases* — any reply that
+  doesn't quote the engine's price is discarded.
+- **Storefront:** one `<script>` line in the theme registers the tools on
+  `document.modelContext` (with the `navigator.modelContext` fallback) and
+  talks to the server.
+- **Tested like an agent:** a Playwright suite shims the WebMCP runtime,
+  captures the registered tools and plays the buyer through full negotiations —
+  in CI on every push to main and on every PR. The live store loads this same
+  storefront source file, pinned by commit on a CDN.
 
 ### Challenges we ran into
 
-- Keeping the secret price floor *structurally* unleakable while still letting
-  an LLM speak for the seller (solution: the LLM only phrases; guards discard
-  off-script numbers).
-- WebMCP is brand new — building against the spec plus Chrome's
+- Letting an LLM speak for the seller without ever letting it touch a number.
+- WebMCP is brand new — built against the spec, Chrome's
   `enable-webmcp-testing` flag and ChatGPT's in-app browser, with a
   `navigator.modelContext` fallback for older builds.
-- Real-store plumbing: Shopify custom-app tokens, scopes, and a theme with a
-  broken product template that had to be diagnosed and fixed before the demo
-  could run on genuine product pages.
+- Real-store plumbing: custom-app tokens, scopes, and a theme with a broken
+  product template to diagnose before the demo could run on genuine product
+  pages.
 
 ### Accomplishments that we're proud of
 
-- A complete, live agent-to-agent commerce loop on a real store: negotiate →
-  deal → real discount code → normal checkout.
-- Safety by structure, not by prompt: the floor cannot be jailbroken out of the
-  seller because the seller never knows anything the engine didn't decide.
-- The whole negotiation surface is reproducible without any accounts:
+- The loop at the top is not a mock-up — it runs on a real store, and anyone
+  can verify it.
+- The whole negotiation surface is reproducible without accounts:
   `MOCK_PRODUCTS=1` fixture mode, a standalone `demo.html`, a smoke script and
-  an e2e suite that anyone (including judges) can run.
+  an e2e suite judges can run.
 
 ### What we learned
 
-Tools beat chat for commerce: exposing a *protocol* (offers, rounds, state,
-acceptance) gives agents something they can be genuinely good at, while the
-human keeps the decisions that matter. And WebMCP's page-level tool
-registration composes beautifully — our negotiation tools sat next to
-Shopify's native cart tools with zero coordination.
+Tools beat chat for commerce: a *protocol* (offers, rounds, state, acceptance)
+gives agents something they can be genuinely good at, while the human keeps
+the decisions that matter. And WebMCP's page-level registration composes
+beautifully — our negotiation tools sat next to Shopify's native cart tools
+with zero coordination.
 
 ### What's next for Haggle
 
 Dynamic tool lifecycle (registering `make_offer`/`accept_deal` only while a
-negotiation is open, via WebMCP's AbortSignal unregistration), per-product and
-inventory-aware floors via metafields, per-customer pricing strategies, bundle
-haggling ("throw in a helmet"), and a merchant dashboard with negotiation
-analytics. And of course: turning it on for a store that isn't behind a
-dev-store password.
+negotiation is open, via AbortSignal unregistration), per-product and
+inventory-aware floors via metafields, bundle haggling ("throw in a helmet"),
+a merchant dashboard with negotiation analytics — and turning it on for a
+store that isn't behind a dev-store password.
 
 ## Built with
 
