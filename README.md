@@ -2,6 +2,8 @@
 
 [![CI](https://github.com/noktohq/haggle/actions/workflows/ci.yml/badge.svg)](https://github.com/noktohq/haggle/actions/workflows/ci.yml)
 
+*English (primary) — [norsk utgave](README.no.md).*
+
 **The first bike store where your agent negotiates the price.** Haggle adds
 [WebMCP](https://github.com/webmachinelearning/webmcp) tools to a real Shopify
 storefront so the customer's agent (ChatGPT's browser, or Chrome with WebMCP
