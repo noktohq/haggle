@@ -19,6 +19,11 @@ store with a real e-bike catalog. By [Nokto](https://nokto.no).
 from 18 999 kr to 18 000 kr — the widget (bottom right) shows the deal and the
 real single-use discount code the human applies in the normal checkout.*
 
+**Try it live:** open [bikepoint-no.myshopify.com](https://bikepoint-no.myshopify.com)
+(store password `haggle`) in ChatGPT's browser, or in Chrome with
+`chrome://flags/#enable-webmcp-testing` — go to any product page and ask your
+agent to get you a better price.
+
 ## Why this needed WebMCP
 
 Price negotiation on the web has never existed at scale because it required a

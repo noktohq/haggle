@@ -135,4 +135,6 @@ the browser loop without Shopify.
 
 ## Video
 
-(YouTube link — added at submission time)
+(YouTube link — added at submission time. Under 3 minutes, shows the live
+store, a full negotiation by an agent, and the discount code applied at
+checkout. Unlisted is fine — Devpost only needs the link to resolve.)
