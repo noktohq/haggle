@@ -1,0 +1,19 @@
+{
+  "name": "haggle-e2e",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Playwright end-to-end tests for Haggle's WebMCP storefront layer",
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1",
+    "@types/node": "^20.19.43",
+    "typescript": "^5.9.3"
+  }
+}
