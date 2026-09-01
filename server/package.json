@@ -1,0 +1,15 @@
+{
+  "name": "haggle-server",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Server-side negotiation engine for Haggle — WebMCP price negotiation for Shopify storefronts",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
