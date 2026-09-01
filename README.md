@@ -1,6 +1,6 @@
 # Haggle — your AI haggles with our AI
 
-[![CI](https://github.com/noktohq/haggle-/actions/workflows/ci.yml/badge.svg)](https://github.com/noktohq/haggle-/actions/workflows/ci.yml)
+[![CI](https://github.com/noktohq/haggle/actions/workflows/ci.yml/badge.svg)](https://github.com/noktohq/haggle/actions/workflows/ci.yml)
 
 **The first bike store where your agent negotiates the price.** Haggle adds
 [WebMCP](https://github.com/webmachinelearning/webmcp) tools to a real Shopify
@@ -10,8 +10,14 @@ becomes a real single-use Shopify discount code the human redeems in the normal
 checkout.
 
 Built for the [WebMCP Challenge](https://webmcp.devpost.com/) on
-[Bikepoint](https://bikepoint-97ueppd7.myshopify.com), a Shopify development
+[Bikepoint](https://bikepoint-no.myshopify.com), a Shopify development
 store with a real e-bike catalog. By [Nokto](https://nokto.no).
+
+![Live negotiation on Bikepoint](docs/images/live-deal.png)
+
+*A real negotiation on the live store: the buyer's agent talked the seller down
+from 18 999 kr to 18 000 kr — the widget (bottom right) shows the deal and the
+real single-use discount code the human applies in the normal checkout.*
 
 ## Why this needed WebMCP
 

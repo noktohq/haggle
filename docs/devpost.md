@@ -104,7 +104,7 @@ password.
 ## Try it out — links
 
 - Live store (dev store): <https://bikepoint-no.myshopify.com> — password: `haggle`
-- Source: <https://github.com/noktohq/haggle->
+- Source: <https://github.com/noktohq/haggle>
 - API (Cloud Run): <https://haggle-463490695016.europe-north1.run.app>
 
 ## Testing instructions for judges
@@ -123,7 +123,7 @@ password.
 **Without any accounts (reproducible):**
 
 ```bash
-git clone https://github.com/noktohq/haggle- && cd haggle-/server
+git clone https://github.com/noktohq/haggle && cd haggle/server
 npm test                          # engine test suite (price floor, rounds, leaks)
 MOCK_PRODUCTS=1 node src/index.js # fixture catalog on :8080
 bash ../scripts/smoke.sh          # black-box negotiation over HTTP
