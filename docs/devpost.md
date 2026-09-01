@@ -135,6 +135,6 @@ the browser loop without Shopify.
 
 ## Video
 
-(YouTube link — added at submission time. Under 3 minutes, shows the live
-store, a full negotiation by an agent, and the discount code applied at
-checkout. Unlisted is fine — Devpost only needs the link to resolve.)
+<https://youtu.be/yQ7mweGOoYQ> — 1:55, public. Shows the live store, a full
+agent negotiation, and the discount code applied in the cart at the
+negotiated price.
