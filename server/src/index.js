@@ -31,13 +31,20 @@ function corsHeaders(origin) {
     !origin ||
     allowed.includes('*') ||
     allowed.includes(origin) ||
-    (allowed.length === 0 && /^https:\/\/[a-z0-9-]+\.myshopify\.com$/.test(origin));
-  return {
-    'Access-Control-Allow-Origin': ok ? origin || '*' : 'null',
+    (allowed.length === 0 &&
+      (/^https:\/\/[a-z0-9-]+\.myshopify\.com$/.test(origin) ||
+        /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(origin)));
+  /** @type {Record<string, string>} */
+  const headers = {
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Content-Type': 'application/json; charset=utf-8',
+    Vary: 'Origin',
   };
+  // On deny the header is omitted entirely — an explicit 'null' would grant
+  // access to sandboxed iframes and file:// pages, whose origin is "null".
+  if (ok) headers['Access-Control-Allow-Origin'] = origin || '*';
+  return headers;
 }
 
 /**
@@ -76,6 +83,9 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'GET' && url.pathname === '/api/products') {
       // Mock mode only — live mode lists products via the storefront's own /products.json
+      if (process.env.MOCK_PRODUCTS !== '1') {
+        return void send(res, 404, headers, { error: 'not available in live mode — use the storefront catalog' });
+      }
       return void send(res, 200, headers, { products: MOCK_CATALOG.map(({ id, ...p }) => p) });
     }
 
@@ -84,7 +94,15 @@ const server = http.createServer(async (req, res) => {
       if (typeof productHandle !== 'string' || !/^[a-z0-9-]{1,120}$/.test(productHandle)) {
         return void send(res, 400, headers, { error: 'invalid productHandle' });
       }
-      const product = await fetchProductByHandle(productHandle);
+      let product;
+      try {
+        product = await fetchProductByHandle(productHandle);
+      } catch (err) {
+        if (err instanceof Error && err.message === 'product not found') {
+          return void send(res, 404, headers, { error: 'product not found' });
+        }
+        throw err;
+      }
       const s = createNegotiation(product, MAX_DISCOUNT_PCT);
       const id = newSessionId();
       if (sessions.size >= SESSION_LIMIT) {
@@ -99,14 +117,14 @@ const server = http.createServer(async (req, res) => {
     const m = url.pathname.match(/^\/api\/session\/([A-Za-z0-9_-]{1,32})$/);
     if (req.method === 'GET' && m) {
       const s = sessions.get(m[1]);
-      if (!s) return void send(res, 404, headers, { error: 'unknown session' });
+      if (!s) return void send(res, 404, headers, { error: 'unknown session', code: 'UNKNOWN_SESSION' });
       return void send(res, 200, headers, publicView(s));
     }
 
     if (req.method === 'POST' && url.pathname === '/api/offer') {
       const { sessionId, offerNOK } = await readJson(req);
       const s = sessions.get(String(sessionId));
-      if (!s) return void send(res, 404, headers, { error: 'unknown session' });
+      if (!s) return void send(res, 404, headers, { error: 'unknown session', code: 'UNKNOWN_SESSION' });
       let decision;
       try {
         decision = applyOffer(s, offerNOK);
@@ -124,7 +142,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && url.pathname === '/api/accept') {
       const { sessionId } = await readJson(req);
       const s = sessions.get(String(sessionId));
-      if (!s) return void send(res, 404, headers, { error: 'unknown session' });
+      if (!s) return void send(res, 404, headers, { error: 'unknown session', code: 'UNKNOWN_SESSION' });
       let dealPrice;
       try {
         dealPrice = acceptStanding(s);

@@ -72,3 +72,21 @@ test('lowball gets tiny concession', () => {
   assert.equal(d.kind, 'reject');
   assert.ok(d.sellerOffer >= 29000, 'barely concedes on lowball');
 });
+
+test('scripted lowballing cannot undercut the final offer', () => {
+  const s = createNegotiation(bike, 10);
+  for (let i = 0; i < MAX_ROUNDS; i++) applyOffer(s, 1);
+  const finalOffer = s.sellerOffer;
+  assert.ok(finalOffer > s.floor, 'final offer sits above the floor');
+  // Probing with the exact floor after the final offer is NOT accepted…
+  const d = applyOffer(s, s.floor);
+  assert.notEqual(d.kind, 'accept');
+  // …and sealing the deal lands at the final offer, not the floor.
+  assert.equal(acceptStanding(s), finalOffer);
+});
+
+test('floor is rounded up, so the max-discount ceiling is exact', () => {
+  const s = createNegotiation({ ...bike, price: 18999 }, 10);
+  assert.ok(s.floor >= 18999 * 0.9, `floor ${s.floor} below 90% of list`);
+  assert.equal(s.floor % 50, 0);
+});

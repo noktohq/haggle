@@ -61,7 +61,8 @@ function toHuman(n) {
  */
 export function createNegotiation(product, maxDiscountPct) {
   const listPrice = Math.round(Number(product.price));
-  const floor = toHuman(listPrice * (1 - maxDiscountPct / 100));
+  // Rounded UP to the next 50, so the max-discount ceiling is never exceeded.
+  const floor = Math.ceil((listPrice * (1 - maxDiscountPct / 100)) / 50) * 50;
   return {
     productHandle: product.handle,
     productId: product.id,
@@ -87,7 +88,7 @@ export function applyOffer(s, rawOffer) {
   const offer = Math.round(Number(rawOffer));
   if (!Number.isFinite(offer) || offer <= 0) throw new Error('invalid offer');
 
-  s.rounds += 1;
+  s.rounds = Math.min(s.rounds + 1, MAX_ROUNDS);
   s.history.push({ who: 'buyer', price: offer });
 
   // Buyer meets or beats our standing ask → deal at our ask (never charge more than asked).
@@ -98,10 +99,13 @@ export function applyOffer(s, rawOffer) {
     return { kind: 'accept', sellerOffer: s.sellerOffer, dealPrice: s.dealPrice };
   }
 
-  // Acceptance threshold eases toward the floor as rounds pass.
+  // Acceptance threshold eases toward the final-offer level as rounds pass —
+  // never all the way down to the floor, so a scripted lowballer can't undercut
+  // the "immovable" final offer by probing for the floor itself.
   const gapAll = s.listPrice - s.floor;
   const ease = Math.min(1, s.rounds / MAX_ROUNDS);
-  const acceptAt = toHuman(s.floor + gapAll * 0.3 * (1 - ease));
+  const finalAsk = Math.max(s.floor, toHuman(s.floor + gapAll * 0.05));
+  const acceptAt = Math.max(toHuman(s.floor + gapAll * 0.3 * (1 - ease)), finalAsk);
   if (offer >= acceptAt && offer >= s.floor) {
     s.state = 'agreed';
     s.dealPrice = offer;
@@ -111,7 +115,7 @@ export function applyOffer(s, rawOffer) {
 
   // Out of rounds → one immovable final offer; anything less stays open only for accept_deal.
   if (s.rounds >= MAX_ROUNDS) {
-    s.sellerOffer = Math.max(s.floor, toHuman(s.floor + gapAll * 0.05));
+    s.sellerOffer = finalAsk;
     s.history.push({ who: 'seller', price: s.sellerOffer, final: true });
     return { kind: 'final', sellerOffer: s.sellerOffer };
   }

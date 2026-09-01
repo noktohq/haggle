@@ -20,9 +20,11 @@ from 18 999 kr to 18 000 kr — the widget (bottom right) shows the deal and the
 real single-use discount code the human applies in the normal checkout.*
 
 **Try it live:** open [bikepoint-no.myshopify.com](https://bikepoint-no.myshopify.com)
-(store password `haggle`) in ChatGPT's browser, or in Chrome with
-`chrome://flags/#enable-webmcp-testing` — go to any product page and ask your
-agent to get you a better price.
+(store password `haggle`) in ChatGPT's in-app browser, go to any product page
+and ask your agent to get you a better price. (Chrome's
+`chrome://flags/#enable-webmcp-testing` exposes the WebMCP surface so the tools
+register, but stock Chrome ships no agent that drives them — pair it with a
+WebMCP-driving agent/extension, or use ChatGPT's browser for the full loop.)
 
 ## Why this needed WebMCP
 
@@ -90,10 +92,13 @@ curl -s -X POST localhost:8080/api/accept -H 'Content-Type: application/json' \
 
 Or let the machines do it: `bash scripts/smoke.sh` runs that exact loop, and
 `cd e2e && npm ci && npx playwright test` plays the buyer's agent in Chromium
-against the real storefront script — the same checks CI runs on every push.
+against the real storefront script — the same checks CI runs on every push to
+main and on every PR.
 
-Or serve `storefront/` statically over HTTPS and open `demo.html` in Chrome with
-`chrome://flags/#enable-webmcp-testing` for the full WebMCP loop without Shopify.
+Or serve `storefront/` statically (e.g. `npx http-server storefront`) and open
+`demo.html` in a WebMCP-enabled browser while the mock server runs — the server
+accepts localhost origins out of the box, and `?api=<url>` points the page at
+any other server.
 
 ## Production setup
 
@@ -102,6 +107,11 @@ Or serve `storefront/` statically over HTTPS and open `demo.html` in Chrome with
    (custom app with `read_products` + `write_discounts`), `MAX_DISCOUNT_PCT`,
    optional `ANTHROPIC_API_KEY`.
 3. Install the theme snippet: see `storefront/INSTALL.md`.
+
+Note: on Cloud Run's `*.run.app` domain, `GET /healthz` is intercepted by
+Google's frontend before it reaches the container (you get Google's HTML 404).
+Probe `POST /api/session` for production health checks; `/healthz` works
+locally and in CI.
 
 ## Engineering notes
 

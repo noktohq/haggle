@@ -68,7 +68,8 @@ export async function sellerMessage(kind, params, round) {
         max_tokens: 150,
         system:
           'Du er en sjarmerende, litt vittig sykkelselger i Skien. Skriv ETT kort svar på norsk (maks 2 setninger). ' +
-          'Du MÅ bruke nøyaktig prisene du får oppgitt — aldri nevn andre tall, aldri lov mer rabatt.',
+          'Du MÅ bruke nøyaktig prisene du får oppgitt — aldri nevn andre tall, aldri lov mer rabatt. ' +
+          'Skriv tall uten tusenskilletegn (18350, ikke 18 350).',
         messages: [
           {
             role: 'user',
@@ -82,8 +83,11 @@ export async function sellerMessage(kind, params, round) {
     const body = /** @type {any} */ (await res.json());
     const text = (body.content?.[0]?.text || '').trim();
     // Guard: the phrased message must mention the authoritative number.
+    // Whitespace (incl. nbsp) is stripped first so "18 350" still counts as
+    // 18350; digit boundaries so "218350" does not.
     const mustMention = String(params.sellerOffer ?? params.dealPrice);
-    if (!text || !text.includes(mustMention)) return fallback;
+    const stripped = text.replace(/[\s\u00a0\u202f]/g, '');
+    if (!text || !new RegExp(`(^|\\D)${mustMention}(\\D|$)`).test(stripped)) return fallback;
     return text;
   } catch {
     return fallback;

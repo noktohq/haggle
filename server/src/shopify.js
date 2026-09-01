@@ -34,6 +34,7 @@ async function adminGraphql(query, variables) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': token },
     body: JSON.stringify({ query, variables }),
+    signal: AbortSignal.timeout(10_000),
   });
   if (!res.ok) throw new Error(`Shopify HTTP ${res.status}`);
   const body = /** @type {any} */ (await res.json());

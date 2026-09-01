@@ -76,7 +76,7 @@ test('full agent loop: list, negotiate over two offers, accept, get a redeemable
   const list = await callTool(page, 'list_negotiable_products');
   const product = list.products.find((p: any) => p.handle === HANDLE);
   expect(product, `catalog should contain ${HANDLE}`).toBeTruthy();
-  const listPrice: number = product.price;
+  const listPrice: number = product.priceNOK;
   expect(listPrice).toBeGreaterThan(0);
 
   const start = await callTool(page, 'start_negotiation', { productHandle: HANDLE });

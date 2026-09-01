@@ -36,13 +36,27 @@
       body: body ? JSON.stringify(body) : undefined,
     });
     const json = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(json.error || `API ${res.status}`);
+    if (!res.ok) {
+      const err = Object.assign(new Error(json.error || `API ${res.status}`), { code: json.code });
+      throw err;
+    }
     return json;
   }
 
   function currentHandle() {
     const m = location.pathname.match(/\/products\/([a-z0-9-]+)/);
     return m ? m[1] : null;
+  }
+
+  // The server keeps sessions in memory; a restart or instance swap loses them.
+  // Drop the stale id and tell the agent how to recover instead of dead-ending.
+  function lostSession(e) {
+    if (e && (e.code === 'UNKNOWN_SESSION' || e.message === 'unknown session')) {
+      sessionStorage.removeItem('haggle:session');
+      sessionId = null;
+      return asError('session lost (the server restarted) — call start_negotiation again to reopen');
+    }
+    return null;
   }
 
   /* ---------- tiny on-page widget so the human sees the haggling ---------- */
@@ -93,7 +107,13 @@
         }
         // Not on a Shopify origin (e.g. the standalone demo page) — ask the API.
         const alt = await api('/api/products');
-        return asResult(alt);
+        return asResult({
+          products: (alt.products || []).map((p) => ({
+            title: p.title,
+            handle: p.handle,
+            priceNOK: Number(p.priceNOK ?? p.price) || null,
+          })),
+        });
       } catch (e) {
         return asError('could not list products: ' + e.message);
       }
@@ -106,7 +126,7 @@
       'Open a price negotiation with the store’s AI seller for a product. Input the product handle (from list_negotiable_products, or omit on a product page to use the current product). Returns the seller’s opening message and the listed price. Then use make_offer.',
     inputSchema: {
       type: 'object',
-      properties: { productHandle: { type: 'string', description: 'Product handle, e.g. "ecoride-tripper-gen4"' } },
+      properties: { productHandle: { type: 'string', description: 'Product handle, e.g. "demo-ecoride-tripper"' } },
     },
     async execute({ productHandle } = {}) {
       const handle = productHandle || currentHandle();
@@ -158,7 +178,7 @@
               : 'Counter again with make_offer, or lock the seller’s current offer with accept_deal.',
         });
       } catch (e) {
-        return asError(e.message);
+        return lostSession(e) || asError(e.message);
       }
     },
   });
@@ -172,7 +192,7 @@
       try {
         return asResult(await api('/api/session/' + sessionId));
       } catch (e) {
-        return asError(e.message);
+        return lostSession(e) || asError(e.message);
       }
     },
   });
@@ -196,7 +216,7 @@
           instructions: r.howToUse,
         });
       } catch (e) {
-        return asError(e.message);
+        return lostSession(e) || asError(e.message);
       }
     },
   });
