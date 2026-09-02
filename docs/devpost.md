@@ -1,20 +1,3 @@
-# Devpost submission — WebMCP Challenge
-
-Copy-paste source for the Devpost form. Keep this file in sync with what is
-actually submitted. **Oppdatert 2026-09-01 — må limes inn i Devpost-skjemaet
-før fristen 3. september kl. 22:00 norsk tid (13:00 PDT); skjemaet låses da.**
-
-## Project name
-
-Haggle
-
-## Elevator pitch (tagline)
-
-The first bike store where your AI haggles the price with our AI — and the deal
-becomes a real discount code at a real Shopify checkout.
-
-## About the project
-
 ### Inspiration
 
 Price negotiation died when commerce moved online — it needed a human on both
@@ -133,38 +116,22 @@ inventory-aware floors via metafields, bundle haggling ("throw in a helmet"),
 a merchant dashboard with negotiation analytics — and turning it on for a
 store that isn't behind a dev-store password.
 
-## Built with
+### Try it (judges)
 
-`javascript` `node.js` `webmcp` `shopify` `claude` `google-cloud-run`
-`playwright` `github-actions`
+**Best path: ChatGPT's browser.** Open <https://bikepoint-no.myshopify.com>
+(store password: `haggle`), go to a product page such as
+`/products/scultura-endurance-300`, and ask the agent: *"This store lets you
+negotiate the price — use its tools to get me a better deal on this bike."*
+The widget bottom-right shows the negotiation live. Accept a deal → apply the
+single-use code at checkout. Try to push the seller below its floor — it
+won't go.
 
-## Try it out — links
+Chrome's `chrome://flags/#enable-webmcp-testing` exposes the WebMCP surface so
+the tools register (console logs `[haggle] WebMCP tools registered`), but
+stock Chrome ships no agent that drives them — pair the flag with a
+WebMCP-driving agent/extension, or use ChatGPT's browser for the full loop.
 
-- Live store (dev store): <https://bikepoint-no.myshopify.com> — password: `haggle`
-- Source: <https://github.com/noktohq/haggle>
-- API (Cloud Run): <https://haggle-463490695016.europe-north1.run.app>
-
-## Testing instructions for judges
-
-**On the live store — the full agent loop:**
-
-1. **Best path: ChatGPT's browser.** Open
-   <https://bikepoint-no.myshopify.com> (store password: `haggle`) in ChatGPT's
-   in-app browser and go to any product page, e.g.
-   `/products/scultura-endurance-300`.
-2. Ask the agent, for example: *"This store lets you negotiate the price —
-   use its tools to get me a better deal on this bike."* It will discover the
-   five tools and haggle with the AI seller; the widget bottom-right shows the
-   negotiation live. Try to push the seller below its floor — it won't go.
-3. Accept a deal → you get a real single-use discount code; add the bike to
-   the cart and apply the code at checkout to see the negotiated price.
-4. **Chrome path (API surface only):** `chrome://flags/#enable-webmcp-testing`
-   exposes WebMCP so the tools register (the console logs
-   `[haggle] WebMCP tools registered`), but stock Chrome ships no agent that
-   *drives* the tools — pair the flag with a WebMCP-driving agent or
-   extension, or use ChatGPT's browser for the full loop.
-
-**Without any accounts (reproducible):**
+**Without any accounts:**
 
 ```bash
 git clone https://github.com/noktohq/haggle && cd haggle/server
@@ -172,18 +139,3 @@ npm test                          # engine test suite (price floor, rounds, leak
 MOCK_PRODUCTS=1 node src/index.js # fixture catalog on :8080
 bash ../scripts/smoke.sh          # black-box negotiation over HTTP
 cd ../e2e && npm ci && npx playwright test   # plays the buyer's agent in Chromium
-```
-
-Or serve `storefront/` statically (e.g. `npx http-server storefront`) and open
-`demo.html` in a WebMCP-enabled browser with the `MOCK_PRODUCTS=1` server
-from the block above running — the server accepts localhost origins out of the
-box, and
-`?api=<url>` points the page at any other server. Note: `GET /healthz` on the
-hosted `*.run.app` URL is intercepted by Google's frontend (HTML 404); probe
-`POST /api/session` instead — locally, `/healthz` works as documented.
-
-## Video
-
-<https://youtu.be/yQ7mweGOoYQ> — 1:55, public. Shows the live store, a full
-agent negotiation, and the discount code applied in the cart at the
-negotiated price.
